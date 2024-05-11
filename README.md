@@ -46,12 +46,18 @@ For the best experience, it is recommended to deploy it within a Docker environm
 
 However it works fine as standalone application with standalove OpenVPN server as well.
 ### Intel x86 and AMD64 platforms
-For Baremetal x86-64 servers, Cloud or VM installation, please use [openvpn-aws](https://github.com/d3vilh/openvpn-aws) project.
-It includes all the necessary scripts for easy installation of OpenVPN-UI and OpenVPN server on any x86-64 platform.
+You can run both containers from the official [openvpn-server](https://github.com/d3vilh/openvpn-server) repository, `docker-compose-openvpnui.yml`.
+It includes all the files in its main directory. 
+
+For automated installation on baremetal x86-64 servers, Cloud or VM installation, please use [openvpn-aws](https://github.com/d3vilh/openvpn-aws) project.
+It, as well, includes all the necessary scripts for easy installation of OpenVPN-UI and OpenVPN server on any x86-64 platform.
 
 ### Raspberry-pi and other ARM platforms
 For Raspberry-Pi and other ARM devices, consider [Raspberry-Gateway](https://github.com/d3vilh/raspberry-gateway) project.
 It has all the necessary scripts for easy installation and lot of additional features.
+
+You can run both containers from the [openvpn-server](https://github.com/d3vilh/openvpn-server) repository as well (use `docker-compose-openvpnui.yml`).
+It includes all the files in its main directory, as well. 
 
 ### Manual installation
 
@@ -102,6 +108,7 @@ services:
            - ./staticclients:/etc/openvpn/staticclients
            - ./log:/var/log/openvpn
            - ./fw-rules.sh:/opt/app/fw-rules.sh
+           - ./server.conf:/etc/openvpn/server.conf
        cap_add:
            - NET_ADMIN
        restart: always
@@ -183,6 +190,7 @@ docker run  --interactive --tty --rm \
   -v ./staticclients:/etc/openvpn/staticclients \
   -v ./log:/var/log/openvpn \
   -v ./fw-rules.sh:/opt/app/fw-rules.sh \
+  -v ./server.conf:/etc/openvpn/server.conf \
   --privileged d3vilh/openvpn-server:latest
 ```
   </details>
@@ -218,6 +226,93 @@ cd build; ./build_openvpn-ui.sh
 The new image will have `openvpn-ui` name.
 
   </details>
+
+  <details>
+    <summary>Standalone installation</summary>
+
+#### Standalone installation without docker and docker-compose
+
+If you have your OpenVPN server up and running on the same host, you can install OpenVPN-UI as standalone application.
+For this you need to have GoLang installed on your host to build all the necessary binaries on the server itself.
+
+To make installation easier, version 0.9.5 now includes a [`standalone-install.sh`](https://github.com/d3vilh/openvpn-ui/blob/e2f452d2872a022147f8c58213fa4306f61e65e8/build/standalone-install.sh) script. This script helps you step by step, starting with downloading and installing GoLang, and ending with building the binaries.
+
+At the moment script supports Debian based systems only.
+
+Here is installation process example:
+```bash
+superdude@bookworm64:~/build/openvpn-ui/build$ ./standalone-install.sh
+This script will install OpenVPN-UI and all the dependencies on your local environment. No containers will be used.
+Do you want to continue? (y/n)y
+Golang version 1.21 is not installed.
+Would you like to install it? (y/n) y
+--2024-02-20 16:37:47--  https://golang.org/dl/go1.21.5.linux-amd64.tar.gz
+go1.21.5.linux-amd64.tar.gz      100%[========================================================>]  63.53M  3.01MB/s    in 20s
+2024-02-20 16:38:08 (3.23 MB/s) - 'go1.21.5.linux-amd64.tar.gz' saved [66618285/66618285]
+Would you like to run apt-get update? (y/n) y
+Updating current environment with apt-get update
+[sudo] password for superdude:
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+Would you like to download all necessary Go modules? (y/n) y
+Downloading all Go modules (go mod download)
+Would you like to install Beego v2? (y/n) y
+Installing BeeGo v2
+go: downloading github.com/beego/bee/v2 v2.0.2-0.20230830024958-01d397161933
+go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.4
+Would you like to build OpenVPN-UI and install qrencode? (y/n) y
+Installing OpenVPN-UI and qrencode
+Cloning qrencode into build directory
+Cloning into 'qrencode'...
+remote: Enumerating objects: 35, done.
+Resolving deltas: 100% (8/8), done.
+Building and packing OpenVPN-UI
+2024/02/20 17:15:07 INFO     ▶ 0001 Getting bee latest version...
+2024/02/20 17:15:08 INFO     ▶ 0002 Your bee are up to date
+______
+| ___ \
+| |_/ /  ___   ___
+| ___ \ / _ \ / _ \
+| |_/ /|  __/|  __/
+\____/  \___| \___| v2.1.0
+2024/02/20 17:20:55 SUCCESS  ▶ 0004 Build Successful!
+2024/02/20 17:21:02 SUCCESS  ▶ 0009 Application packed!
+Building qrencode
+Moving qrencode to GOPATH
+All done.
+superdude@bookworm64:~/build/openvpn-ui/build$ 
+```
+After build and installation is complete:
+1. Put archive `openvpn-ui.tar.gz` with binaries to the desired directory where you would like to run OpenVPN-UI from.
+2. Uncompress it with `tar -xzf openvpn-ui.tar.gz`.
+3. Double check openvpn-ui binary has +x permissions for your user.
+4. Create `db` directory in the same directory where `openvpn-ui` binary is located.
+5. Update `OpenVpnPath` and `EasyRsaPath` with real location of your OpenVPN server config (`/etc/openvpn`) and EasyRSA (`/usr/share/easy-rsa`) in main application config file - `./conf/app.conf` file. 
+6. Set `EnableAdmin = false` and `RunMode = prod` in the same file, if you don't need to run BeeGo in development mode and don't need BeeGo admin console to run (in most cases you don't need it).
+7. On the first run set `OPENVPN_ADMIN_USERNAME` and `OPENVPN_ADMIN_PASSWORD` environment variables to create admin user with secret password:
+```bash
+export OPENVPN_ADMIN_USERNAME=admin
+export OPENVPN_ADMIN_PASSWORD=$3kR3tPa$Sw0rd
+```
+8. doublecheck enviroment variables are set properly:
+```bash
+echo $OPENVPN_ADMIN_USERNAME
+echo $OPENVPN_ADMIN_PASSWORD
+```
+This should return your username and password you will use for the first login into UI. It is mandatory to set this vars on the first application start only. So OpenVPN-UI will create your Admin user with your own credentials.
+
+9. Run `./openvpn-ui` binary and login with your new credentials.
+
+10. Go to `Configuration > OpenVPN Server` and update all the fields with your current `server.conf` options.
+
+11. For security reasons **you have to unset**  vars after successful login, so it will be removed from the local server environment:
+
+```bash
+unset OPENVPN_ADMIN_USERNAME
+unset OPENVPN_ADMIN_PASSWORD
+```
+
+  </details>
+
 
 ### Upgrade to new Version
 During the installtion or upgrade process OpenVPN-UI by itself does not do any changes to your OpenVPN server configuration or PKI infrastructure. However it is recommended to perform backup of your `PKI infrastructure`, `server.conf`, `client.conf` and `data.db` before following with upgrade steps.
@@ -374,6 +469,8 @@ And you are done with the upgrade process.
   | **0.9.3** | o_v_client_config | custom_conf_one             | Configuration > OpenVPN Client  |
   | **0.9.3** | o_v_client_config | custom_conf_two             | Configuration > OpenVPN Client  |
   | **0.9.3** | o_v_client_config | custom_conf_three           | Configuration > OpenVPN Client  |
+  | **0.9.4** | **no schema changes** | **no schema changes**     | **no schema changes**           |
+  | **0.9.5** | **no schema changes** | **no schema changes**     | **no schema changes**           |  
 
   </details>
 
@@ -529,12 +626,12 @@ Check detailed subnets description on [here](https://github.com/d3vilh/openvpn-u
 All the Server and Client configuration located in Docker volume and can be easely tuned. Here are tree of volume content:
 
 ```shell
+|-- server.conf   //OpenVPN server configuration file
 |-- clients
 |   |-- your_client1.ovpn
 |-- config
 |   |-- client.conf
 |   |-- easy-rsa.vars //EasyRSA vars draft, see below real vars file.
-|   |-- server.conf
 |-- db
 |   |-- data.db       //OpenVPN UI DB
 |-- log
