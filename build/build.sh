@@ -10,25 +10,31 @@ case $ARCH in
     PLATFORM="linux/arm/v5"
     #UIIMAGE="FROM arm32v5/debian:stable-slim"
     UIIMAGE="FROM arm32v6/alpine" #moving to unstable because it has easy-rsa v3.1.6 which supports cert renewal
-    BEEIMAGE="FROM arm32v5/golang:1.21.5-bookworm"
+    BEEIMAGE="FROM arm32v5/golang:1.21-bookworm"
     ;;
   armv7*)
     PLATFORM="linux/arm/v7"
     #UIIMAGE="FROM arm32v7/debian:stable-slim"
     UIIMAGE="FROM arm32v7/alpine" #moving to unstable because it has easy-rsa v3.1.6 which supports cert renewal
-    BEEIMAGE="FROM arm32v7/golang:1.21.5"
+    BEEIMAGE="FROM arm32v7/golang:1.23.4-bookworm"
     ;;
   aarch64*)
     PLATFORM="linux/arm64/v8"
     #UIIMAGE="FROM arm64v8/debian:stable-slim"
     UIIMAGE="FROM arm64v8/alpine" #moving to unstable because it has easy-rsa v3.1.6 which supports cert renewal
-    BEEIMAGE="FROM golang:1.21.5-bookworm"
+    BEEIMAGE="FROM golang:1.23.4-bookworm"
+    ;;
+  arm64*)
+    PLATFORM="linux/arm64/v8"
+    #UIIMAGE="FROM arm64v8/debian:stable-slim"
+    UIIMAGE="FROM arm64v8/alpine" #moving to unstable because it has easy-rsa v3.1.6 which supports cert renewal
+    BEEIMAGE="FROM golang:1.23.4-bookworm"
     ;;
   *)
     PLATFORM="linux/amd64"
     #UIIMAGE="FROM debian:stable-slim"
     UIIMAGE="FROM alpine" #moving to unstable because it has easy-rsa v3.1.6 which supports cert renewal
-    BEEIMAGE="FROM golang:1.21.5-bookworm"
+    BEEIMAGE="FROM golang:1.23.4-bookworm"
     ;;
 esac
 
@@ -43,10 +49,12 @@ sed -i "s#FROM DEFINE-YOUR-ARCH#$BEEIMAGE#g" Dockerfile-beego
 printf "Dockerfiles updated \n\033[1;34mBuilding Golang and Bee enviroment.\033[0m\n"
 
 # Build golang & bee environment
-docker build --platform=$PLATFORM -f Dockerfile-beego -t local/beego-v8 -t local/beego-v8:latest .
+docker build --progress=plain --platform=$PLATFORM -f Dockerfile-beego -t local/beego-v8 -t local/beego-v8:latest .
 printf "\033[1;34mBuilding OpenVPN-UI and qrencode binaries.\033[0m\n"
 
 # Run a beego-v8 container to build qrencode and execute bee pack
+printf "OpenVPN-UI and qrencode were built \n\033[1;34mBuilding OpenVPN-UI image.\033[0m\n"
+
 time docker run \
     -v "$PWD/../":/go/src/github.com/d3vilh/openvpn-ui \
     -e GO111MODULE='auto' \
@@ -54,7 +62,15 @@ time docker run \
     --rm \
     -w /usr/src/myapp \
     local/beego-v8 \
-sh -c "cd /go/src/github.com/d3vilh/openvpn-ui/ && go env -w GOFLAGS="-buildvcs=false" && bee version && CGO_ENABLED=1 CC=musl-gcc bee pack -exr='^vendor|^ace.tar.bz2|^data.db|^build|^README.md|^docs' && cd /app/qrencode && go build -o qrencode main.go && chmod +x /app/qrencode/qrencode && cp -p /app/qrencode/qrencode /go/src/github.com/d3vilh/openvpn-ui/"
+sh -c "cd /go/src/github.com/d3vilh/openvpn-ui/ && \
+    git config --global --add safe.directory /go/src/github.com/d3vilh/openvpn-ui && \
+    go env -w GOFLAGS=\"-buildvcs=false\" && \
+    bee version && \
+    CGO_ENABLED=1 CC=musl-gcc bee pack -exr='^vendor|^ace.tar.bz2|^data.db|^build|^README.md|^docs' && \
+    cd /app/qrencode && \
+    go build -o qrencode main.go && \
+    chmod +x /app/qrencode/qrencode && \
+    cp -p /app/qrencode/qrencode /go/src/github.com/d3vilh/openvpn-ui/"
 printf "OpenVPN-UI and qrencode were built \n\033[1;34mBuilding OpenVPN-UI image.\033[0m\n"
 
 # Build OpenVPN-UI image
@@ -65,7 +81,7 @@ cp -f ../$UIFILE ./
 
 # Build openvpn-ui image
 docker build -t local/openvpn-ui .
-rm -f $UIFILE; rm -f $(basename $UIFILE); #rm -f $QRFILE; 
+rm -f $UIFILE; rm -f $(basename $UIFILE); #rm -f $QRFILE;
 printf "\033[1;34mAll done.\033[0m\n"
 
 # Benchmarking the end time record

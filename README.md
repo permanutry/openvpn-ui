@@ -44,7 +44,7 @@ For the best experience, it is recommended to deploy it within a Docker environm
  - The [`d3vilh/openvpn-server`](https://github.com/d3vilh/openvpn-server) Back-End container (openvpn) for running OpenVPN server.
  - OpenVPN UI Front-End container (openvpn-ui) for efficient management of the OpenVPN server environment.
 
-However it works fine as standalone application with standalove OpenVPN server as well.
+However it works fine as standalone application with standalone OpenVPN server as well.
 ### Intel x86 and AMD64 platforms
 You can run both containers from the official [openvpn-server](https://github.com/d3vilh/openvpn-server) repository, `docker-compose-openvpnui.yml`.
 It includes all the files in its main directory. 
@@ -83,8 +83,9 @@ It includes all the files in its main directory, as well.
            - /var/run/docker.sock:/var/run/docker.sock:ro
        restart: always
 ```
+---
 
-You can couple OpenVPN-UI with recommended [d3vilh/openvpn-server](https://github.com/d3vilh/openvpn-server) image and here is updated `docker-compose.yml` for it:
+You can also couple OpenVPN-UI with recommended [d3vilh/openvpn-server](https://github.com/d3vilh/openvpn-server) image and here is updated `docker-compose.yml` for it:
 
 ```yaml
 ---
@@ -129,6 +130,34 @@ services:
            - /var/run/docker.sock:/var/run/docker.sock:ro
        restart: always
 ``` 
+
+<details>
+  <summary>If you start this compose file with volumes listed above (click to see detail)</summary>
+
+You have to run these commands before starting:
+
+```shell
+mkdir -p /var/data/d3openvpn # change it as you needed
+cd /var/data/d3openvpn
+
+git clone https://github.com/d3vilh/openvpn-server . # or download the zip file from GitHub if you don't have git installed
+
+sudo docker compose -f docker-compose.yml up -d
+```
+or
+```shell
+mkdir -p /var/data/d3openvpn # change it as you needed
+cd /var/data/d3openvpn
+
+mkdir -p ./config
+wget https://raw.githubusercontent.com/d3vilh/openvpn-server/refs/heads/main/server.conf -O server.conf
+wget https://raw.githubusercontent.com/d3vilh/openvpn-server/refs/heads/main/config/easy-rsa.vars -O config/easy-rsa.vars
+wget https://raw.githubusercontent.com/d3vilh/openvpn-server/refs/heads/main/config/client.conf -O config/client.conf
+echo "" > ./fw-rules.sh
+
+sudo docker compose -f docker-compose.yml up -d
+```
+</details>
 
 **Where:** 
 * `TRUST_SUB` is Trusted subnet, from which OpenVPN server will assign IPs to trusted clients (default subnet for all clients)
@@ -176,7 +205,8 @@ docker run \
 
 Run the OpenVPN Server image:
 ```shell
-cd ~/openvpn-server/ && 
+git clone https://github.com/d3vilh/openvpn-server ~/openvpn-server && \
+cd ~/openvpn-server/ && \
 docker run  --interactive --tty --rm \
   --name=openvpn-server \
   --cap-add=NET_ADMIN \
@@ -797,6 +827,18 @@ For MFA authentication you can use optional `Passphrase` when generating new Cli
 
   </details>
 
+### Authentication with Google APIs (OAuth 2.0)
+Starting from vestion `0.9.5.5` OpenVPN-UI support [OAuth 2.0 authentication with Google APIs](https://developers.google.com/identity/protocols/oauth2).
+
+Gogle configurations can be passed as Environment Variables. Here we can update secrets , cliendID from [google developer console](https://console.developers.google.com/) and allowed domains checked which email domains are allowed. 
+
+Required ENV variables for google login to work.
+>          GOOGLE_CLIENT_ID
+>          GOOGLE_CLIENT_SECRET
+>          GOOGLE_REDIRECT_URL
+>          ALLOWED_DOMAINS
+
+Kudos to [opsnin](https://github.com/d3vilh/openvpn-ui/pull/89) for this feature.
 ### User Management
 Starting from `v.0.9.2` OpenVPN UI has user management feature. 
 
